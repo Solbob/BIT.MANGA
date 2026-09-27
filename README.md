@@ -5,8 +5,10 @@ A responsive manga reading app built on the supplied ACP boilerplate: Next.js Pa
 ## Run locally
 
 ```bash
-docker compose up --build
+docker compose -p bitmanga-local up -d --build
 ```
+
+For recurring build, startup, or login issues, see the [bug-fix log](bug-fix-log.md) before troubleshooting.
 
 - Web app: `http://localhost:3000`
 - API docs: `http://localhost:8000/docs`
