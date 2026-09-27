@@ -4,19 +4,36 @@ A responsive manga reading app built on the supplied ACP boilerplate: Next.js Pa
 
 ## Run locally
 
+1. Open a terminal in the repository root (the directory containing `docker-compose.yaml`). Make sure Docker is running.
+2. Build and start the website, API, and PostgreSQL database on a standard Docker host:
+
 ```bash
 docker compose -p bitmanga-local up -d --build
 ```
 
+In GitHub Codespaces, use the networking override instead:
+
+```bash
+docker compose -p bitmanga-local -f docker-compose.yaml -f docker-compose.codespaces.yaml up -d --build
+```
+
+3. Wait until PostgreSQL reports `healthy` and the other services report `Up`:
+
+	```bash
+	docker compose -p bitmanga-local ps
+	```
+
+4. Open the website at `http://localhost:3000`. The API documentation is at `http://localhost:8000/docs`.
+5. Sign in with one of the local demo accounts:
+	- Reader: `demo@example.com` / `password`
+	- Admin: `admin@example.com` / `admin123`
+6. To stop the services without deleting the database volume, run:
+
+	```bash
+	docker compose -p bitmanga-local stop
+	```
+
 For recurring build, startup, or login issues, see the [bug-fix log](bug-fix-log.md) before troubleshooting.
-
-- Web app: `http://localhost:3000`
-- API docs: `http://localhost:8000/docs`
-
-Local demo accounts:
-
-- Reader: `demo@example.com` / `password`
-- Admin: `admin@example.com` / `admin123`
 
 Registration creates Free accounts. The local admin account is seeded only when `SEED_ADMIN_PASSWORD` is set. Compose provides development defaults; replace them along with `JWT_SECRET` for any shared or deployed environment. Serve production traffic through HTTPS at the deployment edge.
 

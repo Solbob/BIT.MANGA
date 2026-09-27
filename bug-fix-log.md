@@ -16,14 +16,24 @@ The Docker/BuildKit layer and snapshot store was inconsistent, and the stopped P
 
 **Fix**
 
-1. If BuildKit reports missing content digests or parent snapshots, build both images with Docker's legacy builder:
+1. Preferred fix: create and select a fresh BuildKit builder, then use the normal Compose command. Choose an unused builder name if `bitmanga-fresh` already exists:
+
+   ```bash
+   docker buildx create --name bitmanga-fresh --driver docker-container --use --bootstrap
+   docker compose -p bitmanga-local up -d --build
+   ```
+
+   Selecting it with `--use` makes it the default builder for subsequent Compose builds in this Docker context. If the named builder already exists, select it with `docker buildx use bitmanga-fresh` instead of creating it again. This was verified to rebuild both images and start the app successfully.
+
+2. If a fresh builder cannot be created or its image import is canceled, fall back to Docker's legacy builder:
 
    ```bash
    DOCKER_BUILDKIT=0 docker build --no-cache -t bitmanga-local-backend-api:latest ./backend-api
    DOCKER_BUILDKIT=0 docker build --no-cache -t bitmanga-local-nextjs:latest ./nextjs
+   docker compose -p bitmanga-local up -d --no-build
    ```
 
-2. If the existing database container specifically reports `RWLayer ... is unexpectedly nil`, remove and recreate only that container. This preserves its named data volume:
+3. If the existing database container specifically reports `RWLayer ... is unexpectedly nil`, remove and recreate only that container. This preserves its named data volume:
 
    ```bash
    docker compose -p bitmanga-local stop
@@ -31,7 +41,7 @@ The Docker/BuildKit layer and snapshot store was inconsistent, and the stopped P
    docker compose -p bitmanga-local up -d --no-build
    ```
 
-3. Verify services with `docker compose -p bitmanga-local ps`; PostgreSQL should be healthy, and the web/API endpoints should respond at `http://localhost:3000` and `http://localhost:8000/docs`.
+4. Verify services with `docker compose -p bitmanga-local ps`; PostgreSQL should be healthy, and the web/API endpoints should respond at `http://localhost:3000` and `http://localhost:8000/docs`.
 
 **Important**
 
@@ -46,8 +56,14 @@ The Docker/BuildKit layer and snapshot store was inconsistent, and the stopped P
 
 **Cause and fix**
 
-This Codespaces Docker environment could not resolve/reach Compose service names across its bridge network, although host-published ports were reachable. Local Compose now routes Next.js to `host.docker.internal:8000` and FastAPI to `host.docker.internal:5432`; `extra_hosts` maps that name to the host gateway. Production Compose intentionally retains internal service names.
+This Codespaces Docker environment could not reach Compose services across its bridge network, although host-published ports were reachable. The portable `docker-compose.yaml` uses Compose service DNS (`backend-api` and `db`), which is the normal setup on other Docker hosts. For Codespaces only, use `docker-compose.codespaces.yaml`; it routes Next.js and FastAPI through `host.docker.internal` and maps that name to the host gateway. Production Compose also uses internal service names.
+
+Start the Codespaces variant with:
+
+```bash
+docker compose -p bitmanga-local -f docker-compose.yaml -f docker-compose.codespaces.yaml up -d --build
+```
 
 **Verification**
 
-Reader and Admin login through `http://localhost:3000/api/auth/login` returned `200`; the API completed startup and the site returned `200`. If this symptom returns, inspect `docker compose -p bitmanga-local logs nextjs backend-api db` and verify the local gateway settings in `docker-compose.yaml` and `nextjs/next.config.mjs` before editing auth code.
+Reader and Admin login through `http://localhost:3000/api/auth/login` returned `200`; the API completed startup and the site returned `200`. If this symptom returns, inspect `docker compose -p bitmanga-local logs nextjs backend-api db` and verify the Codespaces override and `nextjs/next.config.mjs` before editing auth code.

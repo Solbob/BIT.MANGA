@@ -1,0 +1,12 @@
+services:
+  nextjs:
+    environment:
+      API_URL: http://host.docker.internal:8000
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  backend-api:
+    environment:
+      POSTGRES_HOST: host.docker.internal
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
