@@ -2,8 +2,8 @@ FROM node:20.17
 
 WORKDIR /src
 
-COPY package.json ./
-RUN npm install
+COPY package.json package-lock.json ./
+RUN npm ci
 
 COPY . .
 RUN npx next telemetry disable

@@ -6,8 +6,8 @@ export default function App({ Component, pageProps }) {
   return (
     <>
       <Head>
-        <title>ACP App</title>
-        <meta name="description" content="ACP App teaching boilerplate" />
+        <title>BIT.MANGA — Stories, frame by frame</title>
+        <meta name="description" content="Find your next favorite manga. Read free stories or unlock every chapter with Premium." />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
       <Component {...pageProps} />

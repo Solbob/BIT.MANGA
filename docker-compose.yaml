@@ -40,6 +40,9 @@ services:
       POSTGRES_PASSWORD: temp
       POSTGRES_DB: advcompro
       POSTGRES_HOST: db
+      JWT_SECRET: ${JWT_SECRET:-local-development-secret-change-before-deploy}
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-admin@example.com}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-admin123}
     command: uvicorn app:app --host 0.0.0.0 --port 8000 --reload
     depends_on:
       db:
