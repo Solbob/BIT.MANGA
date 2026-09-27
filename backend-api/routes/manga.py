@@ -3,10 +3,11 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Literal, Optional
 
+import bcrypt
 import jwt
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 
 from database import database, get_user_by_id
 from routes.auth import JWT_ALGORITHM, JWT_SECRET
@@ -131,6 +132,28 @@ class AdminMetricsResponse(BaseModel):
     signups_by_tier: list[SignupPoint]
     transaction_trend: list[TransactionPoint]
     as_of: datetime
+
+
+class AdminUserCreate(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=128)
+    role: Literal["admin", "free", "premium"] = "free"
+
+
+class AdminUserUpdate(BaseModel):
+    email: EmailStr
+    role: Literal["admin", "free", "premium"]
+    password: Optional[str] = Field(default=None, min_length=8, max_length=128)
+
+
+class AdminUserResponse(BaseModel):
+    id: int
+    email: str
+    role: Literal["admin", "free", "premium"]
+    created_at: datetime
+    last_active_at: datetime
+    subscription_status: Optional[str] = None
+    subscription_expires_at: Optional[datetime] = None
 
 
 async def get_current_user_with_role(
@@ -503,6 +526,182 @@ async def get_me(user=Depends(get_current_user_with_role)):
     result.pop("token_version", None)
     result["subscription"] = dict(subscription) if subscription else None
     return result
+
+
+@router.get("/admin/users", response_model=list[AdminUserResponse])
+async def admin_list_users(
+    search: str = Query(default="", max_length=255),
+    limit: int = Query(default=200, ge=1, le=500),
+    user=Depends(require_roles("admin")),
+):
+    term = search.strip()
+    rows = await database.fetch_all(
+        """
+        SELECT u.id, u.email, u.role, u.created_at, u.last_active_at,
+               s.status AS subscription_status, s.expires_at AS subscription_expires_at
+        FROM users u LEFT JOIN subscriptions s ON s.user_id = u.id
+        WHERE (:search = '' OR u.email ILIKE :pattern OR CAST(u.id AS TEXT) ILIKE :pattern)
+        ORDER BY u.created_at DESC, u.id DESC LIMIT :limit
+        """,
+        {"search": term, "pattern": f"%{term}%", "limit": limit},
+    )
+    return [dict(row) for row in rows]
+
+
+@router.post("/admin/users", response_model=AdminUserResponse, status_code=201)
+async def admin_create_user(
+    payload: AdminUserCreate, user=Depends(require_roles("admin"))
+):
+    email = str(payload.email).lower()
+    password_hash = bcrypt.hashpw(
+        payload.password.encode("utf-8"), bcrypt.gensalt()
+    ).decode("utf-8")
+    try:
+        async with database.transaction():
+            row = await database.fetch_one(
+                """
+                INSERT INTO users (email, password_hash, password, role)
+                VALUES (:email, :password_hash, :password_hash, :role)
+                RETURNING id, email, role, created_at, last_active_at
+                """,
+                {"email": email, "password_hash": password_hash, "role": payload.role},
+            )
+            if payload.role == "premium":
+                await database.execute(
+                    """
+                    INSERT INTO subscriptions (user_id, status, expires_at)
+                    VALUES (:user_id, 'active', NOW() + INTERVAL '30 days')
+                    """,
+                    {"user_id": row["id"]},
+                )
+    except Exception as exc:
+        if "unique" in str(exc).lower():
+            raise HTTPException(status_code=409, detail="Email is already registered")
+        raise
+    result = dict(row)
+    result["subscription_status"] = "active" if payload.role == "premium" else None
+    result["subscription_expires_at"] = None
+    if payload.role == "premium":
+        result["subscription_expires_at"] = await database.fetch_val(
+            "SELECT expires_at FROM subscriptions WHERE user_id = :user_id",
+            {"user_id": row["id"]},
+        )
+    return result
+
+
+@router.patch("/admin/users/{user_id}", response_model=AdminUserResponse)
+async def admin_update_user(
+    user_id: int,
+    payload: AdminUserUpdate,
+    user=Depends(require_roles("admin")),
+):
+    if user_id == int(user["id"]):
+        raise HTTPException(status_code=400, detail="You cannot edit your own account here")
+
+    email = str(payload.email).lower()
+    password_hash = None
+    if payload.password is not None:
+        password_hash = bcrypt.hashpw(
+            payload.password.encode("utf-8"), bcrypt.gensalt()
+        ).decode("utf-8")
+
+    try:
+        async with database.transaction():
+            await database.execute("SELECT pg_advisory_xact_lock(74102026)")
+            current = await database.fetch_one(
+                "SELECT id, role FROM users WHERE id = :id FOR UPDATE",
+                {"id": user_id},
+            )
+            if current is None:
+                raise HTTPException(status_code=404, detail="User not found")
+            if current["role"] == "admin" and payload.role != "admin":
+                admin_count = await database.fetch_val(
+                    "SELECT COUNT(*) FROM users WHERE role = 'admin'"
+                )
+                if admin_count <= 1:
+                    raise HTTPException(
+                        status_code=400, detail="The last admin cannot be demoted"
+                    )
+
+            row = await database.fetch_one(
+                """
+                UPDATE users SET email = :email, role = :role,
+                    password_hash = COALESCE(:password_hash, password_hash),
+                    password = COALESCE(:password_hash, password),
+                    token_version = token_version + 1
+                WHERE id = :id
+                RETURNING id, email, role, created_at, last_active_at
+                """,
+                {
+                    "id": user_id,
+                    "email": email,
+                    "role": payload.role,
+                    "password_hash": password_hash,
+                },
+            )
+
+            if payload.role == "premium":
+                active_subscription = await database.fetch_val(
+                    """
+                    SELECT user_id FROM subscriptions
+                    WHERE user_id = :user_id AND status = 'active' AND expires_at > NOW()
+                    """,
+                    {"user_id": user_id},
+                )
+                if active_subscription is None:
+                    await database.execute(
+                        """
+                        INSERT INTO subscriptions (user_id, status, started_at, expires_at)
+                        VALUES (:user_id, 'active', NOW(), NOW() + INTERVAL '30 days')
+                        ON CONFLICT (user_id) DO UPDATE SET
+                            status = 'active', started_at = NOW(),
+                            expires_at = NOW() + INTERVAL '30 days'
+                        """,
+                        {"user_id": user_id},
+                    )
+            else:
+                await database.execute(
+                    """
+                    UPDATE subscriptions SET status = 'cancelled', expires_at = NOW()
+                    WHERE user_id = :user_id AND status = 'active'
+                    """,
+                    {"user_id": user_id},
+                )
+            subscription = await database.fetch_one(
+                "SELECT status, expires_at FROM subscriptions WHERE user_id = :user_id",
+                {"user_id": user_id},
+            )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        if "unique" in str(exc).lower():
+            raise HTTPException(status_code=409, detail="Email is already registered")
+        raise
+
+    result = dict(row)
+    result["subscription_status"] = subscription["status"] if subscription else None
+    result["subscription_expires_at"] = subscription["expires_at"] if subscription else None
+    return result
+
+
+@router.delete("/admin/users/{user_id}", status_code=204)
+async def admin_delete_user(user_id: int, user=Depends(require_roles("admin"))):
+    if user_id == int(user["id"]):
+        raise HTTPException(status_code=400, detail="You cannot delete your own account")
+    async with database.transaction():
+        await database.execute("SELECT pg_advisory_xact_lock(74102026)")
+        target = await database.fetch_one(
+            "SELECT id, role FROM users WHERE id = :id FOR UPDATE", {"id": user_id}
+        )
+        if target is None:
+            raise HTTPException(status_code=404, detail="User not found")
+        if target["role"] == "admin":
+            admin_count = await database.fetch_val(
+                "SELECT COUNT(*) FROM users WHERE role = 'admin'"
+            )
+            if admin_count <= 1:
+                raise HTTPException(status_code=400, detail="The last admin cannot be deleted")
+        await database.execute("DELETE FROM users WHERE id = :id", {"id": user_id})
 
 
 @router.get("/admin/metrics", response_model=AdminMetricsResponse)
