@@ -12,6 +12,11 @@ export default function Pricing() {
   const [toast, setToast] = useState("");
   const [error, setError] = useState(false);
 
+  async function handleSignOut() {
+    await signOut();
+    await refresh();
+  }
+
   useEffect(() => {
     if (!toast) return;
     const timer = setTimeout(() => setToast(""), 3500);
@@ -36,7 +41,7 @@ export default function Pricing() {
   if (loading || !user) return <main className="page-loading">Loading membership…</main>;
   return (
     <main className="app-page pricing-page">
-      <SiteHeader user={user} onSignOut={() => { signOut(); refresh(); }} />
+      <SiteHeader user={user} onSignOut={handleSignOut} />
       <section className="pricing-heading"><p className="eyebrow">A LITTLE MORE STORY</p><h1>Choose how you<br /><em>want to read.</em></h1><p>Stay free, or open the door to every chapter.</p></section>
       <section className="plan-grid">
         <article className="plan-card free-plan">

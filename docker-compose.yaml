@@ -9,6 +9,10 @@ services:
       - /src/node_modules
     working_dir: /src
     command: npm run dev
+    environment:
+      API_URL: http://host.docker.internal:8000
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - backend-api
 
@@ -39,11 +43,13 @@ services:
       POSTGRES_USER: temp
       POSTGRES_PASSWORD: temp
       POSTGRES_DB: advcompro
-      POSTGRES_HOST: db
+      POSTGRES_HOST: host.docker.internal
       JWT_SECRET: ${JWT_SECRET:-local-development-secret-change-before-deploy}
       SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-admin@example.com}
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-admin123}
     command: uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       db:
         condition: service_healthy

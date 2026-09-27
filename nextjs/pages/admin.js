@@ -62,6 +62,11 @@ export default function Admin() {
   const [metrics, setMetrics] = useState(null);
   const [error, setError] = useState("");
 
+  async function handleSignOut() {
+    await signOut();
+    await refresh();
+  }
+
   useEffect(() => {
     if (!user || user.role !== "admin") return;
     apiFetch("/admin/metrics").then(setMetrics).catch((err) => setError(err.message));
@@ -71,7 +76,7 @@ export default function Admin() {
   const money = (value) => new Intl.NumberFormat(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(value || 0);
   return (
     <main className="app-page admin-page">
-      <SiteHeader user={user} onSignOut={() => { signOut(); refresh(); }} />
+      <SiteHeader user={user} onSignOut={handleSignOut} />
       <section className="page-heading admin-heading"><div><p className="eyebrow">THE BIG PICTURE</p><h1>Reader <em>signals.</em></h1></div><span className="report-date">UPDATED {metrics ? new Date(metrics.as_of).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }).toUpperCase() : "—"}</span></section>
       {error && <Toast message={error} kind="error" />}
       {metrics && <>

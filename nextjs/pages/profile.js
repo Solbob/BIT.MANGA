@@ -11,6 +11,11 @@ export default function Profile() {
   const [bookmarks, setBookmarks] = useState([]);
   const [toast, setToast] = useState("");
 
+  async function handleSignOut() {
+    await signOut();
+    await refresh();
+  }
+
   useEffect(() => {
     if (!user) return;
     apiFetch("/bookmarks").then(setBookmarks).catch((err) => setToast(err.message));
@@ -29,7 +34,7 @@ export default function Profile() {
   if (loading || !user) return <main className="page-loading">Loading your library…</main>;
   return (
     <main className="app-page">
-      <SiteHeader user={user} onSignOut={() => { signOut(); refresh(); }} />
+      <SiteHeader user={user} onSignOut={handleSignOut} />
       <section className="page-heading profile-heading"><div><p className="eyebrow">YOUR ACCOUNT</p><h1>Your reading <em>shelf.</em></h1></div><span className={`tier-pill tier-${user.role}`}>{user.role}</span></section>
       <section className="profile-grid">
         <aside className="profile-summary">

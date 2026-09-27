@@ -67,8 +67,15 @@ export function useAuth(requiredRole) {
   return { user, setUser, loading, refresh };
 }
 
-export function signOut() {
+export async function signOut() {
   if (typeof window !== "undefined") {
+    const token = getToken();
+    if (token) {
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      }).catch(() => {});
+    }
     localStorage.removeItem("token");
     localStorage.removeItem("email");
   }

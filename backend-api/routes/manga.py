@@ -1,7 +1,7 @@
 import json
 from datetime import datetime, timezone
 from decimal import Decimal
-from typing import Optional
+from typing import Literal, Optional
 
 import jwt
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -40,6 +40,99 @@ class BookmarkInput(BaseModel):
     last_read_chapter_id: Optional[int] = Field(default=None, gt=0)
 
 
+class SeriesResponse(BaseModel):
+    id: int
+    title: str
+    description: str
+    cover_image: str
+    is_premium: bool
+    chapter_count: int = 0
+
+
+class ChapterSummaryResponse(BaseModel):
+    id: int
+    series_id: int
+    number: int
+    title: str
+    created_at: datetime
+
+
+class ChapterResponse(ChapterSummaryResponse):
+    content: list[str]
+
+
+class BookmarkResponse(BaseModel):
+    id: int
+    series_id: int
+    last_read_chapter_id: Optional[int] = None
+    updated_at: datetime
+    title: Optional[str] = None
+    cover_image: Optional[str] = None
+    is_premium: Optional[bool] = None
+    last_read_chapter_number: Optional[int] = None
+    last_read_chapter_title: Optional[str] = None
+
+
+class SubscriptionResponse(BaseModel):
+    status: Literal["active", "expired", "cancelled"]
+    started_at: datetime
+    expires_at: datetime
+
+
+class UserResponse(BaseModel):
+    id: int
+    email: str
+    role: Literal["admin", "free", "premium"]
+    created_at: datetime
+    subscription: Optional[SubscriptionResponse] = None
+
+
+class TransactionResponse(BaseModel):
+    id: int
+    amount: Decimal
+    status: Literal["pending", "success", "failed"]
+    created_at: datetime
+
+
+class CheckoutResponse(BaseModel):
+    transaction: TransactionResponse
+    role: Literal["premium"]
+
+
+class RevenuePoint(BaseModel):
+    month: str
+    mrr: float
+
+
+class SignupPoint(BaseModel):
+    month: str
+    free: int
+    premium: int
+    admin: int
+
+
+class TransactionPoint(BaseModel):
+    month: str
+    transaction_count: int
+    transaction_volume: float
+
+
+class AdminMetricsResponse(BaseModel):
+    active_users: int
+    total_users: int
+    premium_users: int
+    conversion_rate: float
+    transaction_count: int
+    transaction_volume: float
+    active_subscriptions: int
+    projected_mrr: float
+    projected_arr: float
+    mrr_trend: list[RevenuePoint]
+    signups_by_tier: list[SignupPoint]
+    transaction_trend: list[TransactionPoint]
+    as_of: datetime
+
+
 async def get_current_user_with_role(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer),
 ):
@@ -50,6 +143,7 @@ async def get_current_user_with_role(
             credentials.credentials, JWT_SECRET, algorithms=[JWT_ALGORITHM]
         )
         user_id = int(claims["sub"])
+        token_version = int(claims.get("ver", 0))
     except (jwt.InvalidTokenError, KeyError, TypeError, ValueError):
         raise HTTPException(status_code=401, detail="Invalid or expired token")
     await database.execute(
@@ -73,6 +167,8 @@ async def get_current_user_with_role(
     user = await get_user_by_id(user_id)
     if user is None:
         raise HTTPException(status_code=401, detail="Account no longer exists")
+    if user["token_version"] != token_version:
+        raise HTTPException(status_code=401, detail="Invalid or revoked token")
     await database.execute(
         "UPDATE users SET last_active_at = NOW() WHERE id = :id", {"id": user_id}
     )
@@ -109,7 +205,7 @@ def serialize_chapter(row, include_content=True):
     return result
 
 
-@router.get("/series")
+@router.get("/series", response_model=list[SeriesResponse])
 async def list_series(user=Depends(get_current_user_with_role)):
     rows = await database.fetch_all(
         """
@@ -122,7 +218,7 @@ async def list_series(user=Depends(get_current_user_with_role)):
     return [serialize_series(row) for row in rows]
 
 
-@router.post("/series", status_code=201)
+@router.post("/series", response_model=SeriesResponse, status_code=201)
 async def create_series(payload: SeriesInput, user=Depends(require_roles("admin"))):
     try:
         row = await database.fetch_one(
@@ -140,7 +236,7 @@ async def create_series(payload: SeriesInput, user=Depends(require_roles("admin"
     return dict(row)
 
 
-@router.get("/series/{series_id}")
+@router.get("/series/{series_id}", response_model=SeriesResponse)
 async def get_series(series_id: int, user=Depends(get_current_user_with_role)):
     row = await database.fetch_one(
         """
@@ -156,7 +252,7 @@ async def get_series(series_id: int, user=Depends(get_current_user_with_role)):
     return serialize_series(row)
 
 
-@router.patch("/series/{series_id}")
+@router.patch("/series/{series_id}", response_model=SeriesResponse)
 async def update_series(
     series_id: int,
     payload: SeriesInput,
@@ -185,7 +281,7 @@ async def delete_series(series_id: int, user=Depends(require_roles("admin"))):
         raise HTTPException(status_code=404, detail="Series not found")
 
 
-@router.get("/series/{series_id}/chapters")
+@router.get("/series/{series_id}/chapters", response_model=list[ChapterSummaryResponse])
 async def list_chapters(series_id: int, user=Depends(get_current_user_with_role)):
     series = await database.fetch_one(
         "SELECT id, is_premium FROM series WHERE id = :id", {"id": series_id}
@@ -202,7 +298,7 @@ async def list_chapters(series_id: int, user=Depends(get_current_user_with_role)
     return [serialize_chapter(row, include_content=False) for row in rows]
 
 
-@router.post("/chapters", status_code=201)
+@router.post("/chapters", response_model=ChapterResponse, status_code=201)
 async def create_chapter(payload: ChapterInput, user=Depends(require_roles("admin"))):
     row = await database.fetch_one(
         """
@@ -215,7 +311,7 @@ async def create_chapter(payload: ChapterInput, user=Depends(require_roles("admi
     return serialize_chapter(row)
 
 
-@router.get("/chapters/{chapter_id}")
+@router.get("/chapters/{chapter_id}", response_model=ChapterResponse)
 async def get_chapter(chapter_id: int, user=Depends(get_current_user_with_role)):
     row = await database.fetch_one(
         """
@@ -234,7 +330,7 @@ async def get_chapter(chapter_id: int, user=Depends(get_current_user_with_role))
     return result
 
 
-@router.patch("/chapters/{chapter_id}")
+@router.patch("/chapters/{chapter_id}", response_model=ChapterResponse)
 async def update_chapter(
     chapter_id: int,
     payload: ChapterUpdate,
@@ -277,7 +373,7 @@ async def validate_bookmark_chapter(series_id, chapter_id):
         raise HTTPException(status_code=422, detail="Chapter does not belong to this series")
 
 
-@router.get("/bookmarks")
+@router.get("/bookmarks", response_model=list[BookmarkResponse])
 async def list_bookmarks(user=Depends(get_current_user_with_role)):
     rows = await database.fetch_all(
         """
@@ -293,7 +389,7 @@ async def list_bookmarks(user=Depends(get_current_user_with_role)):
     return [dict(row) for row in rows]
 
 
-@router.post("/bookmarks", status_code=201)
+@router.post("/bookmarks", response_model=BookmarkResponse, status_code=201)
 async def upsert_bookmark(payload: BookmarkInput, user=Depends(get_current_user_with_role)):
     series = await database.fetch_one(
         "SELECT id FROM series WHERE id = :id", {"id": payload.series_id}
@@ -330,7 +426,7 @@ async def upsert_bookmark(payload: BookmarkInput, user=Depends(get_current_user_
     return dict(row)
 
 
-@router.patch("/bookmarks/{bookmark_id}")
+@router.patch("/bookmarks/{bookmark_id}", response_model=BookmarkResponse)
 async def update_bookmark(
     bookmark_id: int,
     payload: BookmarkInput,
@@ -365,7 +461,7 @@ async def delete_bookmark(bookmark_id: int, user=Depends(get_current_user_with_r
         raise HTTPException(status_code=404, detail="Bookmark not found")
 
 
-@router.post("/checkout/mock")
+@router.post("/checkout/mock", response_model=CheckoutResponse)
 async def mock_checkout(user=Depends(get_current_user_with_role)):
     if user["role"] == "admin":
         raise HTTPException(status_code=400, detail="Admin accounts do not need a subscription")
@@ -394,7 +490,7 @@ async def mock_checkout(user=Depends(get_current_user_with_role)):
     return {"transaction": dict(transaction), "role": "premium"}
 
 
-@router.get("/users/me")
+@router.get("/users/me", response_model=UserResponse)
 async def get_me(user=Depends(get_current_user_with_role)):
     subscription = await database.fetch_one(
         """
@@ -404,11 +500,12 @@ async def get_me(user=Depends(get_current_user_with_role)):
         {"user_id": user["id"]},
     )
     result = dict(user)
+    result.pop("token_version", None)
     result["subscription"] = dict(subscription) if subscription else None
     return result
 
 
-@router.get("/admin/metrics")
+@router.get("/admin/metrics", response_model=AdminMetricsResponse)
 async def admin_metrics(user=Depends(require_roles("admin"))):
     users = await database.fetch_one(
         """

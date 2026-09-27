@@ -3,12 +3,14 @@ import jwt
 import os
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, EmailStr, Field
 
 from database import database, get_user_by_email
 
 router = APIRouter()
+auth_bearer = HTTPBearer(auto_error=False)
 JWT_SECRET = os.getenv("JWT_SECRET", "local-development-secret-change-before-deploy")
 JWT_ALGORITHM = "HS256"
 
@@ -28,11 +30,16 @@ class LoginResponse(BaseModel):
     role: str
 
 
-def issue_token(user_id: int, role: str) -> str:
+class LogoutResponse(BaseModel):
+    message: str
+
+
+def issue_token(user_id: int, role: str, token_version: int = 0) -> str:
     return jwt.encode(
         {
             "sub": str(user_id),
             "role": role,
+            "ver": token_version,
             "exp": datetime.now(timezone.utc) + timedelta(hours=24),
         },
         JWT_SECRET,
@@ -46,11 +53,11 @@ async def register(payload: RegisterRequest):
         payload.password.encode("utf-8"), bcrypt.gensalt()
     ).decode("utf-8")
     try:
-        user_id = await database.fetch_val(
+        user = await database.fetch_one(
             """
             INSERT INTO users (email, password_hash, password, role)
             VALUES (:email, :password_hash, :password_hash, 'free')
-            RETURNING id
+            RETURNING id, token_version
             """,
             {"email": payload.email.lower(), "password_hash": password_hash},
         )
@@ -59,7 +66,9 @@ async def register(payload: RegisterRequest):
             raise HTTPException(status_code=409, detail="Email is already registered")
         raise
     return LoginResponse(
-        email=payload.email.lower(), token=issue_token(user_id, "free"), role="free"
+        email=payload.email.lower(),
+        token=issue_token(user["id"], "free", user["token_version"]),
+        role="free",
     )
 
 
@@ -80,10 +89,35 @@ async def login(payload: LoginRequest):
         {"id": user["id"]},
     )
     return LoginResponse(
-        email=user["email"], token=issue_token(user["id"], user["role"]), role=user["role"]
+        email=user["email"],
+        token=issue_token(user["id"], user["role"], user["token_version"]),
+        role=user["role"],
     )
 
 
-@router.post("/auth/logout")
-async def logout():
-    return {"message": "Logged out"}
+@router.post("/auth/logout", response_model=LogoutResponse)
+async def logout(
+    credentials: HTTPAuthorizationCredentials | None = Depends(auth_bearer),
+):
+    if credentials is None:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    try:
+        claims = jwt.decode(
+            credentials.credentials, JWT_SECRET, algorithms=[JWT_ALGORITHM]
+        )
+        user_id = int(claims["sub"])
+        token_version = int(claims.get("ver", 0))
+    except (jwt.InvalidTokenError, KeyError, TypeError, ValueError):
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    revoked_user = await database.fetch_val(
+        """
+        UPDATE users SET token_version = token_version + 1
+        WHERE id = :id AND token_version = :token_version
+        RETURNING id
+        """,
+        {"id": user_id, "token_version": token_version},
+    )
+    if revoked_user is None:
+        raise HTTPException(status_code=401, detail="Token is already revoked")
+    return LogoutResponse(message="Logged out")

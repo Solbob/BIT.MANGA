@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 
@@ -18,7 +19,14 @@ database = Database(DATABASE_URL)
 
 
 async def connect_db():
-    await database.connect()
+    for attempt in range(5):
+        try:
+            await database.connect()
+            return
+        except Exception:
+            if attempt == 4:
+                raise
+            await asyncio.sleep(2)
 
 
 async def disconnect_db():
@@ -34,6 +42,7 @@ async def setup_db():
             password_hash TEXT NOT NULL,
             role VARCHAR(16) NOT NULL DEFAULT 'free'
                 CHECK (role IN ('admin', 'free', 'premium')),
+            token_version BIGINT NOT NULL DEFAULT 0,
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             password TEXT,
             token TEXT,
@@ -52,13 +61,38 @@ async def setup_db():
     await database.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_active_at TIMESTAMPTZ")
     await database.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS password TEXT")
     await database.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS token TEXT")
-    await database.execute(
-        "UPDATE users SET password_hash = password WHERE password_hash IS NULL"
+    await database.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS token_version BIGINT DEFAULT 0")
+    legacy_users = await database.fetch_all(
+        """
+        SELECT id, password, password_hash FROM users
+        WHERE password_hash IS NULL
+           OR (password IS NOT NULL AND password IS DISTINCT FROM password_hash)
+        """
     )
+    for user in legacy_users:
+        password_hash = user["password_hash"]
+        if not password_hash and user["password"] is not None:
+            legacy_password = user["password"].encode("utf-8")
+            try:
+                if not user["password"].startswith(("$2a$", "$2b$", "$2y$")):
+                    raise ValueError("Legacy password is not a bcrypt hash")
+                bcrypt.checkpw(b"", legacy_password)
+                password_hash = user["password"]
+            except ValueError:
+                password_hash = bcrypt.hashpw(legacy_password, bcrypt.gensalt()).decode("utf-8")
+        if password_hash:
+            await database.execute(
+                """
+                UPDATE users SET password_hash = :password_hash, password = :password_hash
+                WHERE id = :id
+                """,
+                {"id": user["id"], "password_hash": password_hash},
+            )
     await database.execute(
         "UPDATE users SET created_at = create_at WHERE created_at IS NULL AND create_at IS NOT NULL"
     )
     await database.execute("UPDATE users SET created_at = NOW() WHERE created_at IS NULL")
+    await database.execute("UPDATE users SET token_version = 0 WHERE token_version IS NULL")
     await database.execute(
         "UPDATE users SET last_active_at = created_at WHERE last_active_at IS NULL"
     )
@@ -86,6 +120,8 @@ async def setup_db():
     await database.execute("ALTER TABLE users ALTER COLUMN password_hash SET NOT NULL")
     await database.execute("ALTER TABLE users ALTER COLUMN role SET DEFAULT 'free'")
     await database.execute("ALTER TABLE users ALTER COLUMN role SET NOT NULL")
+    await database.execute("ALTER TABLE users ALTER COLUMN token_version SET DEFAULT 0")
+    await database.execute("ALTER TABLE users ALTER COLUMN token_version SET NOT NULL")
     await database.execute("ALTER TABLE users ALTER COLUMN created_at SET DEFAULT NOW()")
     await database.execute("ALTER TABLE users ALTER COLUMN created_at SET NOT NULL")
     await database.execute("ALTER TABLE users ALTER COLUMN last_active_at SET DEFAULT NOW()")
@@ -237,13 +273,13 @@ async def setup_db():
 
 async def get_user_by_email(email: str):
     return await database.fetch_one(
-        "SELECT id, email, password_hash, role, created_at FROM users WHERE email = :email",
+        "SELECT id, email, password_hash, role, token_version, created_at FROM users WHERE email = :email",
         {"email": email},
     )
 
 
 async def get_user_by_id(user_id: int):
     return await database.fetch_one(
-        "SELECT id, email, role, created_at FROM users WHERE id = :id",
+        "SELECT id, email, role, token_version, created_at FROM users WHERE id = :id",
         {"id": user_id},
     )

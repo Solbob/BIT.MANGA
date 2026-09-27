@@ -20,6 +20,11 @@ export default function Reader() {
   const [chapterForm, setChapterForm] = useState({ number: 1, title: "", content: "" });
   const [editingChapter, setEditingChapter] = useState(null);
 
+  async function handleSignOut() {
+    await signOut();
+    await refresh();
+  }
+
   useEffect(() => {
     if (!user) return;
     apiFetch("/series").then(setSeries).catch((err) => setError(err.message));
@@ -142,7 +147,7 @@ export default function Reader() {
 
   return (
     <main className="app-page">
-      <SiteHeader user={user} onSignOut={() => { signOut(); refresh(); }} />
+      <SiteHeader user={user} onSignOut={handleSignOut} />
       <section className="page-heading">
         <div><p className="eyebrow">THE READING ROOM</p><h1>Find your next <em>world.</em></h1></div>
         <div className="reader-intro"><span className="tier-pill">{user.role}</span><span>Stories worth staying up for.</span></div>

@@ -44,4 +44,10 @@ The initial database setup upgrades the starter's original users table in place 
 
 PostgreSQL stores users, series, chapters, bookmarks, subscriptions, and transactions with foreign keys. Free accounts can save 20 series; Premium and Admin accounts have no bookmark cap. Premium subscriptions expire after 30 days and the API restores the Free role when an expired account next makes an authenticated request.
 
-Configure a strong `JWT_SECRET` and unique `SEED_ADMIN_PASSWORD` outside development. The Compose defaults are for local coursework only. In a deployed environment, terminate TLS at a trusted HTTPS proxy/load balancer and do not expose the development credentials or database port publicly.
+Configure a strong `JWT_SECRET` and unique `SEED_ADMIN_PASSWORD` outside development. The Compose defaults are for local coursework only. For a TLS-terminated production deployment, point a DNS name at the host and provide production credentials through the shell or an uncommitted `.env` file, then run:
+
+```bash
+docker compose -p bitmanga-prod -f docker-compose.yaml -f docker-compose.production.yaml up -d --build
+```
+
+Set `PUBLIC_DOMAIN`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `JWT_SECRET`, and `SEED_ADMIN_PASSWORD` before running the command. Caddy obtains and renews the HTTPS certificate; only ports 80 and 443 are published in this configuration. The production project name keeps its PostgreSQL volume separate from the local development database.
