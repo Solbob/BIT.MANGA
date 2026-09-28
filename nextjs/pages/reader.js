@@ -13,6 +13,7 @@ export default function Reader() {
   const [selected, setSelected] = useState(null);
   const [chapters, setChapters] = useState([]);
   const [chapter, setChapter] = useState(null);
+  const [readerMinimized, setReaderMinimized] = useState(false);
   const [search, setSearch] = useState("");
   const [toast, setToast] = useState("");
   const [error, setError] = useState("");
@@ -39,6 +40,7 @@ export default function Reader() {
   async function openSeries(item) {
     setSelected(item);
     setChapter(null);
+    setReaderMinimized(false);
     try {
       setChapters(await apiFetch(`/series/${item.id}/chapters`));
     } catch (err) {
@@ -50,6 +52,7 @@ export default function Reader() {
     try {
       const data = await apiFetch(`/chapters/${item.id}`);
       setChapter(data);
+      setReaderMinimized(false);
       await apiFetch("/bookmarks", {
         method: "POST",
         body: JSON.stringify({ series_id: item.series_id, last_read_chapter_id: item.id }),
@@ -90,6 +93,8 @@ export default function Reader() {
       await apiFetch(`/series/${selected.id}`, { method: "DELETE" });
       setSeries((current) => current.filter((item) => item.id !== selected.id));
       setSelected(null);
+      setChapter(null);
+      setReaderMinimized(false);
       setChapters([]);
       setToast("Series deleted.");
     } catch (err) {
@@ -176,6 +181,10 @@ export default function Reader() {
             <label className="checkbox-line"><input type="checkbox" checked={form.is_premium} onChange={(event) => setForm({ ...form, is_premium: event.target.checked })} /> Premium series</label>
             <Button type="submit" size="sm">Add series</Button>
           </form>}
+          {chapter && !readerMinimized && <div className="chapter-reader chapter-reader-overlay">
+            <div className="reader-chapter-head"><div><span>NOW READING</span><h3>{chapter.title}</h3></div><div className="reader-chapter-controls"><button type="button" onClick={() => setReaderMinimized(true)} aria-label="Minimize reader" title="Show Explore series">−</button><button type="button" onClick={() => setChapter(null)} aria-label="Close chapter" title="Close chapter">×</button></div></div>
+            <div className="reader-pages">{chapter.content.map((image, index) => <img key={`${chapter.id}-${index}`} src={image} alt={`Page ${index + 1}`} loading={index > 1 ? "lazy" : "eager"} />)}</div>
+          </div>}
         </div>
 
         <aside className="detail-pane">
@@ -184,6 +193,7 @@ export default function Reader() {
             <h2 className="detail-title">{selected.title}</h2>
             <p className="detail-description">{selected.description}</p>
             <div className="detail-actions"><Button variant="outline" size="sm" onClick={saveBookmark}>＋ Save to library</Button>{user.role === "admin" && <Button variant="outline" size="sm" onClick={deleteSelectedSeries}>Delete series</Button>}</div>
+            {chapter && readerMinimized && <Button className="reader-resume" variant="outline" size="sm" onClick={() => setReaderMinimized(false)}>Resume reading</Button>}
             <div className="chapter-list-head"><span>CHAPTERS</span><span>{chapters.length} available</span></div>
             <div className="chapter-list">{chapters.map((item) => {
               const locked = selected.is_premium && user.role === "free";
@@ -198,10 +208,6 @@ export default function Reader() {
               <textarea aria-label="Chapter page image URLs" placeholder="One page image URL per line" value={chapterForm.content} onChange={(event) => setChapterForm({ ...chapterForm, content: event.target.value })} required />
               <Button type="submit" size="sm">{editingChapter ? "Save chapter" : "Add chapter"}</Button>
             </form>}
-            {chapter && <div className="chapter-reader">
-              <div className="reader-chapter-head"><div><span>NOW READING</span><h3>{chapter.title}</h3></div><button type="button" onClick={() => setChapter(null)} aria-label="Close chapter">×</button></div>
-              <div className="reader-pages">{chapter.content.map((image, index) => <img key={`${chapter.id}-${index}`} src={image} alt={`Page ${index + 1}`} loading={index > 1 ? "lazy" : "eager"} />)}</div>
-            </div>}
           </>}
           <div className="premium-callout"><span className="callout-symbol">✳</span><div><strong>Read without limits.</strong><span>Unlock every series with Premium.</span></div><Link href="/pricing" aria-label="View Premium plans">↗</Link></div>
         </aside>

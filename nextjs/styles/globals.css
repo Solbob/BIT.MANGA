@@ -115,6 +115,7 @@ h1, h2, h3, p { margin-top: 0; }
 .series-title-row > span { color: #d46648; }
 .series-meta { display: block; margin-top: 5px; color: #92978f; font-size: 9px; }
 .series-selected .series-art { outline: 2px solid #d46648; outline-offset: 2px; }
+.catalog-pane { position: relative; min-width: 0; }
 .detail-pane { min-height: 390px; background: #efeee6; padding: 23px; position: sticky; top: 16px; }
 .detail-topline, .chapter-list-head { display: flex; justify-content: space-between; gap: 10px; color: #8a9289; font-size: 8px; font-weight: 700; letter-spacing: 1px; }
 .premium-label { color: #986c24; }
@@ -149,7 +150,11 @@ h1, h2, h3, p { margin-top: 0; }
 .reader-chapter-head span { color: #d46648; font-size: 8px; font-weight: 700; letter-spacing: 1px; }
 .reader-chapter-head h3 { margin: 6px 0 0; color: #214941; font: 18px "Playfair Display", Georgia, serif; }
 .reader-chapter-head button, .icon-button { width: 30px; height: 30px; display: grid; place-items: center; border: 1px solid #d5d3c9; color: #4f665f; background: transparent; cursor: pointer; font-size: 19px; }
-.reader-pages { max-height: 65vh; overflow-y: auto; display: flex; flex-direction: column; gap: 9px; }
+.reader-chapter-controls { display: flex; gap: 6px; }
+.chapter-reader-overlay { position: absolute; z-index: 5; inset: 0 0 auto; height: min(78vh, 820px); max-height: calc(100vh - 180px); margin: 0; padding: 18px; display: flex; flex-direction: column; border: 1px solid #d7d6cb; background: #f8f7f0; }
+.chapter-reader-overlay .reader-pages { min-height: 0; flex: 1; }
+.reader-resume { margin: -8px 0 18px; }
+.reader-pages { max-height: 65vh; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 9px; }
 .reader-pages img { display: block; width: 100%; height: auto; background: #deded5; }
 .admin-create-form { display: grid; gap: 10px; margin-top: 34px; border-top: 1px solid #deddd3; padding-top: 20px; }
 .admin-create-form .eyebrow { margin-bottom: 6px; }
@@ -407,6 +412,7 @@ h1, h2, h3, p { margin-top: 0; }
   .series-meta { font-size: 8px; }
   .detail-pane { position: static; padding: 19px; }
   .reader-empty { min-height: 205px; }
+  .chapter-reader-overlay { height: min(72vh, 720px); max-height: calc(100vh - 155px); padding: 13px; }
   .pricing-heading { padding: 34px 20px 25px; }
   .pricing-heading h1 { font-size: 39px; }
   .plan-grid { grid-template-columns: 1fr; max-width: 390px; }
