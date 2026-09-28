@@ -1,11 +1,26 @@
 # BIT.MANGA
+> Startup note: use the project launcher from the repo root to avoid repeated Docker runtime failures in Codespaces or stale local Docker environments.
+>
+> Run:
+>
+> ```bash
+> ./start.sh
+> ```
+>
+> This launcher detects the Codespaces override, recreates only the app containers if Docker state is stale, retries with the legacy builder if needed, and preserves the PostgreSQL data volume. Do not use `docker compose down -v` or delete the database volume unless you intentionally want to reset all app data.
 
 A responsive manga reading app built on the supplied ACP boilerplate: Next.js Pages Router, shadcn-style UI components, FastAPI, PostgreSQL, bcrypt password hashes, and JWT authentication.
 
 ## Run locally
 
 1. Open a terminal in the repository root (the directory containing `docker-compose.yaml`). Make sure Docker is running.
-2. Build and start the website, API, and PostgreSQL database on a standard Docker host:
+2. Use the safe project launcher:
+
+```bash
+./start.sh
+```
+
+This handles the known Docker stale-state and Codespaces networking issue automatically. If you want to do the lower-level startup directly on a standard Docker host, use:
 
 ```bash
 docker compose -p bitmanga-local up -d --build

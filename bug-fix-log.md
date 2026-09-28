@@ -67,3 +67,31 @@ docker compose -p bitmanga-local -f docker-compose.yaml -f docker-compose.codesp
 **Verification**
 
 Reader and Admin login through `http://localhost:3000/api/auth/login` returned `200`; the API completed startup and the site returned `200`. If this symptom returns, inspect `docker compose -p bitmanga-local logs nextjs backend-api db` and verify the Codespaces override and `nextjs/next.config.mjs` before editing auth code.
+
+## 2026-09-28 — Repeating local startup failure caused by stale Docker runtime state
+
+**Symptoms**
+
+- `docker compose -p bitmanga-local up -d --build` failed during BuildKit startup with `RWLayer ... is unexpectedly nil`.
+- The app containers were marked exited or unhealthy even though the application code had not changed.
+- Browser/HTTP checks showed the frontend and API intermittently failing before they were ready.
+
+**Cause**
+
+The application itself was not failing. The local Docker daemon had stale BuildKit layer metadata and a broken container writable layer. This is a host-level Docker runtime issue, not a Bit.Manga code defect. The project also needed the Codespaces networking override because Compose service names do not resolve consistently in this environment.
+
+**Fix**
+
+1. Preserve the PostgreSQL data volume and recreate only the app containers.
+2. Detect Codespaces and include `docker-compose.codespaces.yaml`.
+3. Retry once using the legacy builder (`DOCKER_BUILDKIT=0`) if BuildKit remains broken.
+4. Then poll the app until both `http://localhost:3000` and `http://localhost:8000/docs` respond successfully.
+5. Use the one-click launcher at `./start.sh` for future restarts instead of the raw Compose command.
+
+```bash
+./start.sh
+```
+
+**Verification**
+
+The launcher completed successfully in the current workspace with exit code `0`. Both endpoints returned `HTTP/1.1 200 OK` after startup, and the database container remained healthy without deleting the Postgres volume.
