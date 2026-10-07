@@ -57,22 +57,42 @@ ensure_builder() {
   fi
 }
 
-repair_stale_state() {
-  echo "Resetting only the app containers; the Postgres volume is preserved."
+STACK_HAS_CONTAINERS=false
+
+stop_existing_stack() {
+  local existing_containers
+  local running_containers
+  existing_containers="$("${compose_cmd[@]}" ps --all -q)"
+  running_containers="$("${compose_cmd[@]}" ps -q)"
+
+  if [[ -n "$existing_containers" ]]; then
+    STACK_HAS_CONTAINERS=true
+  fi
+
+  if [[ -z "$running_containers" ]]; then
+    echo "No running BIT.MANGA services to stop."
+    return
+  fi
+
+  echo "Stopping existing BIT.MANGA services before starting them again."
   "${compose_cmd[@]}" stop || true
+}
 
-  docker ps -aq --filter "name=${PROJECT_NAME}-nextjs-1" | xargs -r docker rm -f >/dev/null 2>&1 || true
-  docker ps -aq --filter "name=${PROJECT_NAME}-backend-api-1" | xargs -r docker rm -f >/dev/null 2>&1 || true
-  docker ps -aq --filter "name=${PROJECT_NAME}-db-1" | xargs -r docker rm -f >/dev/null 2>&1 || true
-
-  docker ps -aq --filter "name=${PROJECT_NAME}-nextjs" | xargs -r docker rm -f >/dev/null 2>&1 || true
-  docker ps -aq --filter "name=${PROJECT_NAME}-backend-api" | xargs -r docker rm -f >/dev/null 2>&1 || true
-  docker ps -aq --filter "name=${PROJECT_NAME}-db" | xargs -r docker rm -f >/dev/null 2>&1 || true
-
-  "${compose_cmd[@]}" rm -f db nextjs backend-api || true
+repair_stale_state() {
+  echo "Removing only stale app containers; the PostgreSQL container and volume are preserved."
+  "${compose_cmd[@]}" stop || true
+  "${compose_cmd[@]}" rm -f nextjs backend-api || true
 }
 
 start_stack() {
+  if [[ "$STACK_HAS_CONTAINERS" == true ]]; then
+    echo "Restarting the existing BIT.MANGA services without rebuilding images..."
+    if "${compose_cmd[@]}" up -d; then
+      return
+    fi
+    echo "Could not restart the existing stack. Falling back to a rebuild."
+  fi
+
   echo "Starting BIT.MANGA with the normal build path..."
   if ! "${compose_cmd[@]}" up -d --build; then
     echo "Normal startup failed. Retrying with the legacy Docker builder and a clean container state."
@@ -82,7 +102,7 @@ start_stack() {
 }
 
 ensure_builder
-repair_stale_state
+stop_existing_stack
 start_stack
 
 echo "--- service status ---"

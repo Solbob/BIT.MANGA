@@ -7,7 +7,7 @@
 > ./start.sh
 > ```
 >
-> This launcher detects the Codespaces override, recreates only the app containers if Docker state is stale, retries with the legacy builder if needed, and preserves the PostgreSQL data volume. Do not use `docker compose down -v` or delete the database volume unless you intentionally want to reset all app data.
+> This launcher detects the Codespaces override, stops any already-running BIT.MANGA services, then starts them again using existing containers and images when available. It builds images on first launch or if reusing the existing stack fails. If a build fails, it retries with the legacy builder after cleaning up only stale app containers. It preserves the PostgreSQL data volume. Do not use `docker compose down -v` or delete the database volume unless you intentionally want to reset all app data.
 
 A responsive manga reading app built on the supplied ACP boilerplate: Next.js Pages Router, shadcn-style UI components, FastAPI, PostgreSQL, bcrypt password hashes, and JWT authentication.
 
@@ -72,7 +72,7 @@ All application routes are under `/api`. Login and registration return a signed 
 - `POST /api/checkout/mock`, `GET /api/users/me`
 - `GET /api/admin/metrics` (Admin only)
 
-The initial database setup upgrades the starter's original users table in place and seeds a small demonstration catalog. Password hashes use bcrypt. The checkout is simulated and records a successful transaction and 30-day subscription; it does not collect payment details.
+The PostgreSQL table definitions and schema upgrades are in [`backend-api/schema.sql`](backend-api/schema.sql). On startup, the API applies that file, upgrades the starter's original users table in place, and seeds a small demonstration catalog. Password hashes use bcrypt. The checkout is simulated and records a successful transaction and 30-day subscription; it does not collect payment details.
 
 ## Data and deployment notes
 
