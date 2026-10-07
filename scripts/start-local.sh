@@ -121,3 +121,13 @@ curl -I --max-time 20 http://localhost:3000
 
 echo "--- api ---"
 curl -I --max-time 20 http://localhost:8000/docs
+
+echo
+echo "DBeaver (PostgreSQL) connection:"
+echo "  Host: localhost"
+echo "  Port: 5555"
+echo "  Database: advcompro"
+echo "  Username: temp"
+echo "  Password: temp"
+echo "To view accounts in DBeaver, expand Databases > advcompro > Schemas > public > Tables,"
+echo "then double-click users. Right-click the table and choose Refresh to reload its rows."

@@ -39,6 +39,7 @@ docker compose -p bitmanga-local -f docker-compose.yaml -f docker-compose.codesp
 	```
 
 4. Open the website at `http://localhost:3000`. The API documentation is at `http://localhost:8000/docs`.
+   To connect to PostgreSQL from DBeaver, create a PostgreSQL connection using host `localhost`, port `5555`, database `advcompro`, username `temp`, and password `temp`. The host port is `5555` to avoid conflicts; PostgreSQL still uses port `5432` inside Docker. To view accounts, expand `Databases` → `advcompro` → `Schemas` → `public` → `Tables`, then double-click `users`. Refresh the table to reload its rows.
 5. Sign in with one of the local demo accounts:
 	- Reader: `demo@example.com` / `password`
 	- Admin: `admin@example.com` / `admin123`
