@@ -2,6 +2,21 @@
 
 > **Copilot instruction:** When diagnosing a recurring or new bug in BIT.MANGA, read this log before changing code. Compare the symptoms with earlier entries and check the relevant app/container logs. After fixing a new bug, append a dated entry with its symptoms, root cause, exact remediation, and verification. Preserve older entries, do not include secrets, and never recommend deleting the PostgreSQL volume as a routine fix.
 
+## 2026-10-12 — Windows terminal could not run the Bash launcher
+
+**Symptoms**
+
+- Running `./start.sh` from PowerShell returned without starting the app.
+- Running `bash ./start.sh` invoked WSL and failed because `/bin/bash` was unavailable.
+
+**Cause and fix**
+
+PowerShell is not a Bash shell, and the system's `bash` command was resolving to WSL rather than Git Bash. The VS Code workspace now selects the Git Bash terminal profile on Windows. Close any already-open PowerShell terminal and create a new integrated terminal after opening the repository in VS Code. Run `./start.sh` or `bash ./start.sh` there. Git for Windows and Docker Desktop are required.
+
+**Verification**
+
+Git Bash's executable and the Docker CLI are present on this machine. The repository configures Git Bash as the default VS Code terminal; service startup still requires Docker Desktop to be running.
+
 ## 2026-09-27 — Local Compose startup/build failure
 
 **Symptoms**

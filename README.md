@@ -13,12 +13,14 @@ A responsive manga reading app built on the supplied ACP boilerplate: Next.js Pa
 
 ## Run locally
 
-1. Open a terminal in the repository root (the directory containing `docker-compose.yaml`). Make sure Docker is running.
-2. Use the safe project launcher:
+1. Open this repository in VS Code. On Windows, the workspace selects Git Bash as its integrated terminal so the Bash launcher works. If a PowerShell terminal is already open, close it and create a new terminal after opening the repository. Git for Windows (which includes Git Bash) and Docker Desktop must be installed and Docker must be running.
+2. In the terminal, from the repository root (the directory containing `docker-compose.yaml`), use the safe project launcher:
 
 ```bash
 ./start.sh
 ```
+
+You can also run `bash ./start.sh` from Git Bash. Do not run these Bash commands in PowerShell: PowerShell may resolve `bash` to WSL, and does not execute `.sh` scripts directly.
 
 This handles the known Docker stale-state and Codespaces networking issue automatically. If you want to do the lower-level startup directly on a standard Docker host, use:
 
