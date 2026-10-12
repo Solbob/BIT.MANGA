@@ -9,11 +9,24 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, EmailStr, Field
 
-from database import database, get_user_by_id
+from database import database, get_user_by_id, persist_catalog_seed
 from routes.auth import JWT_ALGORITHM, JWT_SECRET
 
 router = APIRouter()
 bearer = HTTPBearer(auto_error=False)
+
+
+async def save_catalog_seed_or_raise():
+    try:
+        await persist_catalog_seed()
+    except (OSError, RuntimeError) as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "The catalog change was saved to the database, but "
+                f"backend-api/schema.sql could not be updated: {exc}"
+            ),
+        ) from exc
 
 
 class SeriesInput(BaseModel):
@@ -256,6 +269,7 @@ async def create_series(payload: SeriesInput, user=Depends(require_roles("admin"
         if "unique" in str(exc).lower():
             raise HTTPException(status_code=409, detail="Series title already exists")
         raise
+    await save_catalog_seed_or_raise()
     return dict(row)
 
 
@@ -292,6 +306,7 @@ async def update_series(
     )
     if row is None:
         raise HTTPException(status_code=404, detail="Series not found")
+    await save_catalog_seed_or_raise()
     return dict(row)
 
 
@@ -302,6 +317,7 @@ async def delete_series(series_id: int, user=Depends(require_roles("admin"))):
     )
     if deleted is None:
         raise HTTPException(status_code=404, detail="Series not found")
+    await save_catalog_seed_or_raise()
 
 
 @router.get("/series/{series_id}/chapters", response_model=list[ChapterSummaryResponse])
@@ -331,6 +347,7 @@ async def create_chapter(payload: ChapterInput, user=Depends(require_roles("admi
         """,
         {**payload.model_dump(exclude={"content"}), "content": json.dumps(payload.content)},
     )
+    await save_catalog_seed_or_raise()
     return serialize_chapter(row)
 
 
@@ -373,6 +390,7 @@ async def update_chapter(
     )
     if row is None:
         raise HTTPException(status_code=404, detail="Chapter not found")
+    await save_catalog_seed_or_raise()
     return serialize_chapter(row)
 
 
@@ -383,6 +401,7 @@ async def delete_chapter(chapter_id: int, user=Depends(require_roles("admin"))):
     )
     if deleted is None:
         raise HTTPException(status_code=404, detail="Chapter not found")
+    await save_catalog_seed_or_raise()
 
 
 async def validate_bookmark_chapter(series_id, chapter_id):

@@ -18,6 +18,8 @@ export default function Reader() {
   const [toast, setToast] = useState("");
   const [error, setError] = useState("");
   const [form, setForm] = useState({ title: "", description: "", cover_image: "", is_premium: false });
+  const [editingSeries, setEditingSeries] = useState(null);
+  const [seriesForm, setSeriesForm] = useState({ title: "", description: "", cover_image: "" });
   const [chapterForm, setChapterForm] = useState({ number: 1, title: "", content: "" });
   const [editingChapter, setEditingChapter] = useState(null);
 
@@ -40,9 +42,43 @@ export default function Reader() {
   async function openSeries(item) {
     setSelected(item);
     setChapter(null);
+    setEditingSeries(null);
     setReaderMinimized(false);
     try {
       setChapters(await apiFetch(`/series/${item.id}/chapters`));
+    } catch (err) {
+      setToast(err.message);
+    }
+  }
+
+  function startEditingSeries(section) {
+    setSeriesForm({
+      title: selected.title,
+      description: selected.description,
+      cover_image: selected.cover_image,
+    });
+    setEditingSeries(section);
+  }
+
+  async function saveSeries(event) {
+    event.preventDefault();
+    if (!selected) return;
+    try {
+      const updated = await apiFetch(`/series/${selected.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          ...selected,
+          title: seriesForm.title,
+          description: seriesForm.description,
+          cover_image: seriesForm.cover_image,
+        }),
+      });
+      setSelected((current) => ({ ...current, ...updated, chapter_count: current.chapter_count }));
+      setSeries((current) => current.map((item) => (
+        item.id === updated.id ? { ...item, ...updated, chapter_count: item.chapter_count } : item
+      )));
+      setEditingSeries(false);
+      setToast("Series details updated.");
     } catch (err) {
       setToast(err.message);
     }
@@ -190,9 +226,28 @@ export default function Reader() {
         <aside className="detail-pane">
           {!selected ? <div className="reader-empty"><span className="empty-mark">✳</span><p>Pick a series<br />to see its chapters.</p><span>YOUR NEXT READ IS HERE</span></div> : <>
             <div className="detail-topline"><span>SELECTED SERIES</span>{selected.is_premium && <span className="premium-label">PREMIUM</span>}</div>
-            <h2 className="detail-title">{selected.title}</h2>
-            <p className="detail-description">{selected.description}</p>
-            <div className="detail-actions"><Button variant="outline" size="sm" onClick={saveBookmark}>＋ Save to library</Button>{user.role === "admin" && <Button variant="outline" size="sm" onClick={deleteSelectedSeries}>Delete series</Button>}</div>
+            {editingSeries ? <>
+              <form className="series-edit-form" onSubmit={saveSeries}>
+                {editingSeries === "details" && <>
+                  <Input aria-label="Manga name" placeholder="Manga name" value={seriesForm.title} onChange={(event) => setSeriesForm({ ...seriesForm, title: event.target.value })} required />
+                  <textarea aria-label="Manga description" placeholder="Description" value={seriesForm.description} onChange={(event) => setSeriesForm({ ...seriesForm, description: event.target.value })} />
+                </>}
+                {editingSeries === "cover" && <Input aria-label="Cover image URL" placeholder="Cover image URL" value={seriesForm.cover_image} onChange={(event) => setSeriesForm({ ...seriesForm, cover_image: event.target.value })} required />}
+                <div className="detail-actions">
+                  <Button type="submit" size="sm">{editingSeries === "cover" ? "Save cover" : "Save details"}</Button>
+                  <Button type="button" variant="outline" size="sm" onClick={() => setEditingSeries(null)}>Cancel</Button>
+                </div>
+              </form>
+            </> : <>
+              <h2 className="detail-title">{selected.title}</h2>
+              <p className="detail-description">{selected.description}</p>
+              <div className="detail-actions">
+                <Button variant="outline" size="sm" onClick={saveBookmark}>＋ Save to library</Button>
+                {user.role === "admin" && <Button variant="outline" size="sm" onClick={() => startEditingSeries("details")}>Edit details</Button>}
+                {user.role === "admin" && <Button variant="outline" size="sm" onClick={() => startEditingSeries("cover")}>Edit cover</Button>}
+                {user.role === "admin" && <Button variant="outline" size="sm" onClick={deleteSelectedSeries}>Delete series</Button>}
+              </div>
+            </>}
             {chapter && readerMinimized && <Button className="reader-resume" variant="outline" size="sm" onClick={() => setReaderMinimized(false)}>Resume reading</Button>}
             <div className="chapter-list-head"><span>CHAPTERS</span><span>{chapters.length} available</span></div>
             <div className="chapter-list">{chapters.map((item) => {

@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import tempfile
 from pathlib import Path
 
 import bcrypt
@@ -17,6 +18,114 @@ DATABASE_URL = (
 )
 
 database = Database(DATABASE_URL)
+_catalog_seed_lock = asyncio.Lock()
+
+
+def _sql_literal(value: str) -> str:
+    return "'" + value.replace("'", "''") + "'"
+
+
+def _write_catalog_seed(schema_path: Path, series_rows, chapter_rows) -> None:
+    schema_sql = schema_path.read_text(encoding="utf-8")
+    start_marker = "-- BEGIN AUTO-GENERATED CATALOG SEED"
+    end_marker = "-- END AUTO-GENERATED CATALOG SEED"
+    start = schema_sql.find(start_marker)
+    end = schema_sql.find(end_marker)
+    if start == -1 or end == -1 or end < start:
+        raise RuntimeError("Catalog seed markers are missing from schema.sql")
+
+    seed_lines = [start_marker]
+    if series_rows:
+        values = ",\n".join(
+            "    ({}, {}, {}, {})".format(
+                _sql_literal(row["title"]),
+                _sql_literal(row["description"]),
+                _sql_literal(row["cover_image"]),
+                "TRUE" if row["is_premium"] else "FALSE",
+            )
+            for row in series_rows
+        )
+        seed_lines.extend(
+            [
+                "INSERT INTO series (title, description, cover_image, is_premium)",
+                "VALUES",
+                values,
+                "ON CONFLICT (title) DO UPDATE SET",
+                "    description = EXCLUDED.description,",
+                "    cover_image = EXCLUDED.cover_image,",
+                "    is_premium = EXCLUDED.is_premium;",
+                "-- statement-break",
+            ]
+        )
+
+    if chapter_rows:
+        values = ",\n".join(
+            "    ({}, {}, {}, {})".format(
+                _sql_literal(row["series_title"]),
+                row["number"],
+                _sql_literal(row["title"]),
+                _sql_literal(row["content"]),
+            )
+            for row in chapter_rows
+        )
+        seed_lines.extend(
+            [
+                "INSERT INTO chapters (series_id, number, title, content)",
+                "SELECT series.id, seed.number, seed.title, seed.content",
+                "FROM (",
+                "    VALUES",
+                values,
+                ") AS seed(series_title, number, title, content)",
+                "JOIN series ON series.title = seed.series_title",
+                "ON CONFLICT (series_id, number) DO UPDATE SET",
+                "    title = EXCLUDED.title,",
+                "    content = EXCLUDED.content;",
+                "-- statement-break",
+            ]
+        )
+    seed_lines.append(end_marker)
+
+    updated_schema = (
+        schema_sql[:start] + "\n".join(seed_lines) + schema_sql[end + len(end_marker):]
+    )
+    schema_mode = schema_path.stat().st_mode
+    descriptor, temp_name = tempfile.mkstemp(
+        prefix=f"{schema_path.name}.", suffix=".tmp", dir=schema_path.parent
+    )
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as temp_file:
+            temp_file.write(updated_schema)
+            temp_file.flush()
+            os.fsync(temp_file.fileno())
+        os.chmod(temp_name, schema_mode)
+        os.replace(temp_name, schema_path)
+    except Exception:
+        try:
+            os.unlink(temp_name)
+        except FileNotFoundError:
+            pass
+        raise
+
+
+async def persist_catalog_seed() -> None:
+    async with _catalog_seed_lock:
+        series_rows = await database.fetch_all(
+            """
+            SELECT title, description, cover_image, is_premium
+            FROM series ORDER BY title
+            """
+        )
+        chapter_rows = await database.fetch_all(
+            """
+            SELECT s.title AS series_title, c.number, c.title, c.content
+            FROM chapters c JOIN series s ON s.id = c.series_id
+            ORDER BY s.title, c.number
+            """
+        )
+        schema_path = Path(__file__).with_name("schema.sql")
+        await asyncio.to_thread(
+            _write_catalog_seed, schema_path, series_rows, chapter_rows
+        )
 
 
 async def connect_db():
@@ -164,6 +273,7 @@ async def setup_db():
             """,
             {"series_id": series["id"], "content": json.dumps(pages)},
         )
+    await persist_catalog_seed()
 
 
 async def get_user_by_email(email: str):

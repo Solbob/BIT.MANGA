@@ -100,3 +100,39 @@ CREATE TABLE IF NOT EXISTS transactions (
     status VARCHAR(16) NOT NULL CHECK (status IN ('pending', 'success', 'failed')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+-- statement-break
+
+-- BEGIN AUTO-GENERATED CATALOG SEED
+INSERT INTO series (title, description, cover_image, is_premium)
+VALUES
+    ('Blue Hour Cafe', 'Every night, a tiny cafe serves the people who cannot sleep.', 'https://images.unsplash.com/photo-1442512595331-e89e73853f31?auto=format&fit=crop&w=800&q=85', FALSE),
+    ('Chrome Ronin', 'In a neon sprawl, a disgraced swordsmith builds one last impossible blade.', 'https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=800&q=85', TRUE),
+    ('Kemono Jihen', 'In a remote village, supernatural livestock deaths bring Tokyo detective Kohachi Inugami to investigate. He discovers the ostracized boy Kabane is a half-ghoul, then takes him to Tokyo to join a detective agency handling cases involving hidden supernatural beings. Alongside fellow boys with strange powers, Kabane learns about friendship and his own emotions while searching for his missing parents.', 'https://upload.wikimedia.org/wikipedia/en/2/2d/Kemono_Jihen_1.png?utm_source=en.wikipedia.org&utm_campaign=imageinfo&utm_content=original', FALSE),
+    ('Mirai Suenaga Fanart Collection', 'Comedy manga about school life', 'https://upload.wikimedia.org/wikipedia/commons/8/8f/Mirai_Suenaga_Fanart_-_7586726230.jpg', FALSE),
+    ('Test.series', 'Build for testing database', 'F', FALSE),
+    ('The Last Lantern', 'A quiet courier carries a dying city''s final light through the rain-soaked wilds.', 'https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=800&q=85', FALSE),
+    ('The Melancholy of Haruhi Suzumiya', 'Kyon expects high school to be ordinary until he meets Haruhi Suzumiya, an energetic girl determined to find aliens, time travelers, and espers. After Haruhi starts the SOS Brigade, Kyon discovers its other members really are extraordinary-and Haruhi herself unknowingly has the power to reshape reality. The group must keep her entertained while preventing her whims from changing the world.', 'https://upload.wikimedia.org/wikipedia/en/1/11/Haruhi_book_01_s.jpg?utm_source=en.wikipedia.org&utm_campaign=index&utm_content=original', FALSE)
+ON CONFLICT (title) DO UPDATE SET
+    description = EXCLUDED.description,
+    cover_image = EXCLUDED.cover_image,
+    is_premium = EXCLUDED.is_premium;
+-- statement-break
+INSERT INTO chapters (series_id, number, title, content)
+SELECT series.id, seed.number, seed.title, seed.content
+FROM (
+    VALUES
+    ('Blue Hour Cafe', 1, 'A light in the rain', '["https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=1400&q=85", "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1400&q=85", "https://images.unsplash.com/photo-1470252649378-9c29740c9fa8?auto=format&fit=crop&w=1400&q=85"]'),
+    ('Chrome Ronin', 1, 'A light in the rain', '["https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=1400&q=85", "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1400&q=85", "https://images.unsplash.com/photo-1470252649378-9c29740c9fa8?auto=format&fit=crop&w=1400&q=85"]'),
+    ('Kemono Jihen', 1, 'Part 1: The Village Case', '["https://placehold.co/512x720/ffffff/111111.png?text=Part+1+-+Placeholder"]'),
+    ('Kemono Jihen', 2, 'Part 2: The Inugami Agency', '["https://placehold.co/512x720/ffffff/111111.png?text=Part+2+-+Placeholder"]'),
+    ('Mirai Suenaga Fanart Collection', 1, 'Mirai Suenaga', '["https://upload.wikimedia.org/wikipedia/commons/8/8f/Mirai_Suenaga_Fanart_-_7586726230.jpg"]'),
+    ('Test.series', 1, 'test chap', '["f"]'),
+    ('The Last Lantern', 1, 'A light in the rain', '["https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=1400&q=85", "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1400&q=85", "https://images.unsplash.com/photo-1470252649378-9c29740c9fa8?auto=format&fit=crop&w=1400&q=85"]'),
+    ('The Melancholy of Haruhi Suzumiya', 1, 'Placeholder due to copy right reason', '["https://placehold.co/512x720/ffffff/111111.png?text=Blank+Manga+Page"]')
+) AS seed(series_title, number, title, content)
+JOIN series ON series.title = seed.series_title
+ON CONFLICT (series_id, number) DO UPDATE SET
+    title = EXCLUDED.title,
+    content = EXCLUDED.content;
+-- statement-break
+-- END AUTO-GENERATED CATALOG SEED

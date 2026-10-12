@@ -75,7 +75,7 @@ All application routes are under `/api`. Login and registration return a signed 
 - `POST /api/checkout/mock`, `GET /api/users/me`
 - `GET /api/admin/metrics` (Admin only)
 
-The PostgreSQL table definitions and schema upgrades are in [`backend-api/schema.sql`](backend-api/schema.sql). On startup, the API applies that file, upgrades the starter's original users table in place, and seeds a small demonstration catalog. Password hashes use bcrypt. The checkout is simulated and records a successful transaction and 30-day subscription; it does not collect payment details.
+The PostgreSQL table definitions, schema upgrades, and transferable catalog entries are in [`backend-api/schema.sql`](backend-api/schema.sql). On startup, the API applies that file, upgrades the starter's original users table in place, seeds the demonstration catalog, and refreshes the SQL catalog snapshot. Admin changes to series and chapters (create, edit, or delete) also refresh that snapshot in the same file. The snapshot contains catalog data only, not users, passwords, bookmarks, or transactions. Commit and push the modified SQL file to share the catalog with another checkout; GitHub is not updated automatically. SQL inserts are repeat-safe, and existing catalog edits are reflected in the snapshot. Password hashes use bcrypt. The checkout is simulated and records a successful transaction and 30-day subscription; it does not collect payment details.
 
 ## Data and deployment notes
 
