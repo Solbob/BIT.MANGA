@@ -19,7 +19,7 @@ export default function Reader() {
   const [error, setError] = useState("");
   const [form, setForm] = useState({ title: "", description: "", cover_image: "", is_premium: false });
   const [editingSeries, setEditingSeries] = useState(null);
-  const [seriesForm, setSeriesForm] = useState({ title: "", description: "", cover_image: "" });
+  const [seriesForm, setSeriesForm] = useState({ title: "", description: "", cover_image: "", is_premium: false });
   const [chapterForm, setChapterForm] = useState({ number: 1, title: "", content: "" });
   const [editingChapter, setEditingChapter] = useState(null);
 
@@ -56,6 +56,7 @@ export default function Reader() {
       title: selected.title,
       description: selected.description,
       cover_image: selected.cover_image,
+      is_premium: selected.is_premium,
     });
     setEditingSeries(section);
   }
@@ -71,6 +72,7 @@ export default function Reader() {
           title: seriesForm.title,
           description: seriesForm.description,
           cover_image: seriesForm.cover_image,
+          is_premium: seriesForm.is_premium,
         }),
       });
       setSelected((current) => ({ ...current, ...updated, chapter_count: current.chapter_count }));
@@ -231,6 +233,7 @@ export default function Reader() {
                 {editingSeries === "details" && <>
                   <Input aria-label="Manga name" placeholder="Manga name" value={seriesForm.title} onChange={(event) => setSeriesForm({ ...seriesForm, title: event.target.value })} required />
                   <textarea aria-label="Manga description" placeholder="Description" value={seriesForm.description} onChange={(event) => setSeriesForm({ ...seriesForm, description: event.target.value })} />
+                  <label className="checkbox-line"><input type="checkbox" checked={seriesForm.is_premium} onChange={(event) => setSeriesForm({ ...seriesForm, is_premium: event.target.checked })} /> Premium series</label>
                 </>}
                 {editingSeries === "cover" && <Input aria-label="Cover image URL" placeholder="Cover image URL" value={seriesForm.cover_image} onChange={(event) => setSeriesForm({ ...seriesForm, cover_image: event.target.value })} required />}
                 <div className="detail-actions">
