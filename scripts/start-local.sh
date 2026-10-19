@@ -6,6 +6,45 @@ cd "$ROOT_DIR"
 
 PROJECT_NAME="${PROJECT_NAME:-bitmanga-local}"
 
+start_docker_desktop() {
+  local -a desktop_paths=()
+  local desktop_exe
+  local windows_exe
+
+  if [[ -n "${ProgramW6432:-}" ]]; then
+    desktop_paths+=("$(cygpath -u "$ProgramW6432")/Docker/Docker/Docker Desktop.exe")
+  fi
+  if [[ -n "${ProgramFiles:-}" ]]; then
+    desktop_paths+=("$(cygpath -u "$ProgramFiles")/Docker/Docker/Docker Desktop.exe")
+  fi
+  if [[ -n "${LOCALAPPDATA:-}" ]]; then
+    desktop_paths+=("$(cygpath -u "$LOCALAPPDATA")/Programs/DockerDesktop/Docker Desktop.exe")
+  fi
+  desktop_paths+=("/c/Program Files/Docker/Docker/Docker Desktop.exe")
+
+  for desktop_exe in "${desktop_paths[@]}"; do
+    if [[ -f "$desktop_exe" ]]; then
+      if ! command -v powershell.exe >/dev/null 2>&1; then
+        echo "Could not launch Docker Desktop: powershell.exe was not found." >&2
+        return 1
+      fi
+
+      windows_exe="$(cygpath -w "$desktop_exe")"
+      if ! powershell.exe -NoProfile -NonInteractive -Command \
+        "Start-Process -FilePath '$windows_exe' -ErrorAction Stop" >/dev/null; then
+        echo "Could not launch Docker Desktop at: $windows_exe" >&2
+        return 1
+      fi
+
+      echo "Started Docker Desktop. Waiting for its engine to become ready..."
+      return 0
+    fi
+  done
+
+  echo "Could not find Docker Desktop. Install it or set it up at the default Windows location, then rerun ./start.sh." >&2
+  return 1
+}
+
 ensure_docker_running() {
   if docker info >/dev/null 2>&1; then
     echo "Docker daemon is running."
@@ -14,15 +53,22 @@ ensure_docker_running() {
 
   echo "Docker daemon is not running. Attempting to start it..."
 
-  if command -v sudo >/dev/null 2>&1; then
-    sudo service docker start >/dev/null 2>&1 || sudo systemctl start docker >/dev/null 2>&1 || true
-  fi
+  case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*)
+      start_docker_desktop || exit 1
+      ;;
+    *)
+      if command -v sudo >/dev/null 2>&1; then
+        sudo service docker start >/dev/null 2>&1 || sudo systemctl start docker >/dev/null 2>&1 || true
+      fi
 
-  if command -v dockerd >/dev/null 2>&1; then
-    dockerd >/tmp/bitmanga-dockerd.log 2>&1 &
-  fi
+      if command -v dockerd >/dev/null 2>&1; then
+        dockerd >/tmp/bitmanga-dockerd.log 2>&1 &
+      fi
+      ;;
+  esac
 
-  for _ in $(seq 1 30); do
+  for _ in $(seq 1 120); do
     if docker info >/dev/null 2>&1; then
       echo "Docker daemon is now running."
       return 0
@@ -30,7 +76,7 @@ ensure_docker_running() {
     sleep 1
   done
 
-  echo "Docker daemon could not be started. Please start Docker and rerun ./start.sh." >&2
+  echo "Docker daemon did not become ready. Check Docker Desktop for startup or setup errors, then rerun ./start.sh." >&2
   exit 1
 }
 

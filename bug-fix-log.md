@@ -2,6 +2,20 @@
 
 > **Copilot instruction:** When diagnosing a recurring or new bug in BIT.MANGA, read this log before changing code. Compare the symptoms with earlier entries and check the relevant app/container logs. After fixing a new bug, append a dated entry with its symptoms, root cause, exact remediation, and verification. Preserve older entries, do not include secrets, and never recommend deleting the PostgreSQL volume as a routine fix.
 
+## 2026-10-20 — Windows launcher did not start Docker Desktop
+
+**Symptoms**
+
+- Running `./start.sh` in Git Bash reported that Docker could not be started, even when Docker Desktop was installed.
+
+**Cause and fix**
+
+The startup script attempted Linux service commands (`service`, `systemctl`, and `dockerd`) on Windows instead of opening Docker Desktop. It now detects Git Bash/MSYS/Cygwin, launches Docker Desktop from its standard Program Files or per-user install location, and waits up to two minutes for the daemon. Linux startup behavior remains unchanged.
+
+**Verification**
+
+The Windows-specific startup path was reviewed, but could not be executed here. Verify on Windows by running `./start.sh` with Docker Desktop installed but closed and confirming the launcher opens it and proceeds once `docker info` succeeds.
+
 ## 2026-10-12 — Windows terminal could not run the Bash launcher
 
 **Symptoms**
