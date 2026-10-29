@@ -1,5 +1,4 @@
 import asyncio
-import json
 import os
 import tempfile
 from pathlib import Path
@@ -34,7 +33,13 @@ def _write_catalog_seed(schema_path: Path, series_rows, chapter_rows) -> None:
     if start == -1 or end == -1 or end < start:
         raise RuntimeError("Catalog seed markers are missing from schema.sql")
 
-    seed_lines = [start_marker]
+    seed_lines = [
+        start_marker,
+        "DO $$",
+        "BEGIN",
+        "    IF NOT EXISTS (SELECT 1 FROM catalog_seed_state) THEN",
+        "        IF NOT EXISTS (SELECT 1 FROM series) THEN",
+    ]
     if series_rows:
         values = ",\n".join(
             "    ({}, {}, {}, {})".format(
@@ -50,11 +55,7 @@ def _write_catalog_seed(schema_path: Path, series_rows, chapter_rows) -> None:
                 "INSERT INTO series (title, description, cover_image, is_premium)",
                 "VALUES",
                 values,
-                "ON CONFLICT (title) DO UPDATE SET",
-                "    description = EXCLUDED.description,",
-                "    cover_image = EXCLUDED.cover_image,",
-                "    is_premium = EXCLUDED.is_premium;",
-                "-- statement-break",
+                "ON CONFLICT (title) DO NOTHING;",
             ]
         )
 
@@ -77,13 +78,19 @@ def _write_catalog_seed(schema_path: Path, series_rows, chapter_rows) -> None:
                 values,
                 ") AS seed(series_title, number, title, content)",
                 "JOIN series ON series.title = seed.series_title",
-                "ON CONFLICT (series_id, number) DO UPDATE SET",
-                "    title = EXCLUDED.title,",
-                "    content = EXCLUDED.content;",
-                "-- statement-break",
+                "ON CONFLICT (series_id, number) DO NOTHING;",
             ]
         )
-    seed_lines.append(end_marker)
+    seed_lines.extend(
+        [
+            "        END IF;",
+            "        INSERT INTO catalog_seed_state (id) VALUES (TRUE)",
+            "        ON CONFLICT (id) DO NOTHING;",
+            "    END IF;",
+            "END $$;",
+            end_marker,
+        ]
+    )
 
     updated_schema = (
         schema_sql[:start] + "\n".join(seed_lines) + schema_sql[end + len(end_marker):]
@@ -228,51 +235,6 @@ async def setup_db():
             },
         )
 
-    sample_series = [
-        {
-            "title": "The Last Lantern",
-            "description": "A quiet courier carries a dying city's final light through the rain-soaked wilds.",
-            "cover_image": "https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=800&q=85",
-            "is_premium": False,
-        },
-        {
-            "title": "Chrome Ronin",
-            "description": "In a neon sprawl, a disgraced swordsmith builds one last impossible blade.",
-            "cover_image": "https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=800&q=85",
-            "is_premium": True,
-        },
-        {
-            "title": "Blue Hour Cafe",
-            "description": "Every night, a tiny cafe serves the people who cannot sleep.",
-            "cover_image": "https://images.unsplash.com/photo-1442512595331-e89e73853f31?auto=format&fit=crop&w=800&q=85",
-            "is_premium": False,
-        },
-    ]
-    for item in sample_series:
-        await database.execute(
-            """
-            INSERT INTO series (title, description, cover_image, is_premium)
-            VALUES (:title, :description, :cover_image, :is_premium)
-            ON CONFLICT (title) DO NOTHING
-            """,
-            item,
-        )
-
-    series_rows = await database.fetch_all("SELECT id, title FROM series")
-    for series in series_rows:
-        pages = [
-            "https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=1400&q=85",
-            "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1400&q=85",
-            "https://images.unsplash.com/photo-1470252649378-9c29740c9fa8?auto=format&fit=crop&w=1400&q=85",
-        ]
-        await database.execute(
-            """
-            INSERT INTO chapters (series_id, number, title, content)
-            VALUES (:series_id, 1, 'A light in the rain', :content)
-            ON CONFLICT (series_id, number) DO NOTHING
-            """,
-            {"series_id": series["id"], "content": json.dumps(pages)},
-        )
     await persist_catalog_seed()
 
 

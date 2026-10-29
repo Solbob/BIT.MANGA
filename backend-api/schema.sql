@@ -102,7 +102,17 @@ CREATE TABLE IF NOT EXISTS transactions (
 );
 -- statement-break
 
+CREATE TABLE IF NOT EXISTS catalog_seed_state (
+    id BOOLEAN PRIMARY KEY DEFAULT TRUE CHECK (id),
+    seeded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+-- statement-break
+
 -- BEGIN AUTO-GENERATED CATALOG SEED
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM catalog_seed_state) THEN
+        IF NOT EXISTS (SELECT 1 FROM series) THEN
 INSERT INTO series (title, description, cover_image, is_premium)
 VALUES
     ('Blue Hour Cafe', 'Every night, a tiny cafe serves the people who cannot sleep.', 'https://images.unsplash.com/photo-1442512595331-e89e73853f31?auto=format&fit=crop&w=800&q=85', FALSE),
@@ -111,11 +121,7 @@ VALUES
     ('Mirai Suenaga Collection', 'Comedy manga about school life', 'https://upload.wikimedia.org/wikipedia/commons/8/8f/Mirai_Suenaga_Fanart_-_7586726230.jpg', TRUE),
     ('The Last Lantern', 'A quiet courier carries a dying city''s final light through the rain-soaked wilds.', 'https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=800&q=85', FALSE),
     ('The Melancholy of Haruhi Suzumiya', 'Kyon expects high school to be ordinary until he meets Haruhi Suzumiya, an energetic girl determined to find aliens, time travelers, and espers. After Haruhi starts the SOS Brigade, Kyon discovers its other members really are extraordinary-and Haruhi herself unknowingly has the power to reshape reality. The group must keep her entertained while preventing her whims from changing the world.', 'https://upload.wikimedia.org/wikipedia/en/1/11/Haruhi_book_01_s.jpg?utm_source=en.wikipedia.org&utm_campaign=index&utm_content=original', FALSE)
-ON CONFLICT (title) DO UPDATE SET
-    description = EXCLUDED.description,
-    cover_image = EXCLUDED.cover_image,
-    is_premium = EXCLUDED.is_premium;
--- statement-break
+ON CONFLICT (title) DO NOTHING;
 INSERT INTO chapters (series_id, number, title, content)
 SELECT series.id, seed.number, seed.title, seed.content
 FROM (
@@ -129,8 +135,10 @@ FROM (
     ('The Melancholy of Haruhi Suzumiya', 1, 'Haruhi day!', '["https://i.postimg.cc/pyMprH2d/Screenshot-2026-10-28-213726.png", "https://i.postimg.cc/qqsKHLKQ/Screenshot-2026-10-28-214004.png", "https://i.postimg.cc/t4yKbCKc/Screenshot-2026-10-28-214858.png"]')
 ) AS seed(series_title, number, title, content)
 JOIN series ON series.title = seed.series_title
-ON CONFLICT (series_id, number) DO UPDATE SET
-    title = EXCLUDED.title,
-    content = EXCLUDED.content;
--- statement-break
+ON CONFLICT (series_id, number) DO NOTHING;
+        END IF;
+        INSERT INTO catalog_seed_state (id) VALUES (TRUE)
+        ON CONFLICT (id) DO NOTHING;
+    END IF;
+END $$;
 -- END AUTO-GENERATED CATALOG SEED
