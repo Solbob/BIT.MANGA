@@ -2,6 +2,21 @@
 
 > **Copilot instruction:** When diagnosing a recurring or new bug in BIT.MANGA, read this log before changing code. Compare the symptoms with earlier entries and check the relevant app/container logs. After fixing a new bug, append a dated entry with its symptoms, root cause, exact remediation, and verification. Preserve older entries, do not include secrets, and never recommend deleting the PostgreSQL volume as a routine fix.
 
+## 2026-10-29 — Codespaces API could not connect to PostgreSQL
+
+**Symptoms**
+
+- Login failed because the API process exited during application startup.
+- Port 8000 reset connections, while the frontend remained available and PostgreSQL was healthy on port 5555.
+
+**Cause and fix**
+
+The Codespaces override routed the API to `host.docker.internal`, but omitted the host-published PostgreSQL port. The database listens on container port 5432 and is published on host port 5555, so the API was trying the closed host port 5432. The override now sets `POSTGRES_HOST` to `host.docker.internal:5555`.
+
+**Verification**
+
+Recreated only the API container, preserving the database container and volume. The API root and direct login returned HTTP 200; login through the frontend proxy also returned HTTP 200. PostgreSQL remained reachable on port 5555.
+
 ## 2026-10-20 — Windows launcher did not start Docker Desktop
 
 **Symptoms**

@@ -11,6 +11,10 @@
 
 A responsive manga reading app built on the supplied ACP boilerplate: Next.js Pages Router, shadcn-style UI components, FastAPI, PostgreSQL, bcrypt password hashes, and JWT authentication.
 
+## Live URLs
+
+- Website: https://bit-manga.vercel.app
+
 ## Run locally
 
 1. Open this repository in VS Code. On Windows, the workspace selects Git Bash as its integrated terminal so the Bash launcher works. If a PowerShell terminal is already open, close it and create a new terminal after opening the repository. Git for Windows (which includes Git Bash) and Docker Desktop must be installed. If Docker Desktop is installed in its standard location but not running, the launcher will start it and wait for the engine.

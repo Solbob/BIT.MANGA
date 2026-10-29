@@ -7,6 +7,6 @@ services:
 
   backend-api:
     environment:
-      POSTGRES_HOST: host.docker.internal
+      POSTGRES_HOST: host.docker.internal:5555
     extra_hosts:
       - "host.docker.internal:host-gateway"
