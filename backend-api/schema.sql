@@ -119,8 +119,6 @@ VALUES
     ('Chrome Ronin', 'In a neon sprawl, a disgraced swordsmith builds one last impossible blade.', 'https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=800&q=85', TRUE),
     ('Kemono Jihen', 'In a remote village, supernatural livestock deaths bring Tokyo detective Kohachi Inugami to investigate. He discovers the ostracized boy Kabane is a half-ghoul, then takes him to Tokyo to join a detective agency handling cases involving hidden supernatural beings. Alongside fellow boys with strange powers, Kabane learns about friendship and his own emotions while searching for his missing parents.', 'https://upload.wikimedia.org/wikipedia/en/2/2d/Kemono_Jihen_1.png?utm_source=en.wikipedia.org&utm_campaign=imageinfo&utm_content=original', FALSE),
     ('Mirai Suenaga Collection', 'Comedy manga about school life', 'https://upload.wikimedia.org/wikipedia/commons/8/8f/Mirai_Suenaga_Fanart_-_7586726230.jpg', FALSE),
-    ('Mirai Suenaga Fanart Collection', 'Comedy manga about school life', 'https://upload.wikimedia.org/wikipedia/commons/8/8f/Mirai_Suenaga_Fanart_-_7586726230.jpg', FALSE),
-    ('Test.series', 'Build for testing database', 'F', FALSE),
     ('The Last Lantern', 'A quiet courier carries a dying city''s final light through the rain-soaked wilds.', 'https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=800&q=85', FALSE),
     ('The Melancholy of Haruhi Suzumiya', 'Kyon expects high school to be ordinary until he meets Haruhi Suzumiya, an energetic girl determined to find aliens, time travelers, and espers. After Haruhi starts the SOS Brigade, Kyon discovers its other members really are extraordinary-and Haruhi herself unknowingly has the power to reshape reality. The group must keep her entertained while preventing her whims from changing the world.', 'https://upload.wikimedia.org/wikipedia/en/1/11/Haruhi_book_01_s.jpg?utm_source=en.wikipedia.org&utm_campaign=index&utm_content=original', FALSE)
 ON CONFLICT (title) DO NOTHING;
@@ -130,13 +128,11 @@ FROM (
     VALUES
     ('Blue Hour Cafe', 1, 'A light in the rain', '["https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=1400&q=85", "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1400&q=85", "https://images.unsplash.com/photo-1470252649378-9c29740c9fa8?auto=format&fit=crop&w=1400&q=85"]'),
     ('Chrome Ronin', 1, 'A light in the rain', '["https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=1400&q=85", "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1400&q=85", "https://images.unsplash.com/photo-1470252649378-9c29740c9fa8?auto=format&fit=crop&w=1400&q=85"]'),
-    ('Kemono Jihen', 1, 'Part 1: The Village Case', '["https://static.wikia.nocookie.net/kemonojihen/images/4/42/Inugami_talking_to_Mrs._Kusaka.png/revision/latest?cb=20200619062145", "https://static.wikia.nocookie.net/kemonojihen/images/0/04/Yataro_helps_Inugami.png/revision/latest?cb=20200619062723"]'),
-    ('Kemono Jihen', 2, 'Part 2: The Inugami Agency', '["https://placehold.co/512x720/ffffff/111111.png?text=Part+2+-+Placeholder"]'),
+    ('Kemono Jihen', 1, 'Part 1: The Village Case', '["https://i.postimg.cc/VvYq6n4G/Screenshot-2026-10-28-211258.png", "https://i.postimg.cc/ryn0WBps/Screenshot-2026-10-28-211505.png", "https://i.postimg.cc/BnsjG4Y2/Screenshot-2026-10-28-212443.png"]'),
+    ('Kemono Jihen', 2, 'Part 2: The Inugami Agency', '["https://i.postimg.cc/V6yy3LgG/Screenshot-2026-10-28-212951.png", "https://i.postimg.cc/Wb5Bs7Sk/Screenshot-2026-10-28-213103.png", "https://i.postimg.cc/gjkg7C9b/Screenshot-2026-10-28-213250.png"]'),
     ('Mirai Suenaga Collection', 1, 'Mirai Suenaga', '["https://upload.wikimedia.org/wikipedia/commons/8/8f/Mirai_Suenaga_Fanart_-_7586726230.jpg"]'),
-    ('Mirai Suenaga Fanart Collection', 1, 'Mirai Suenaga', '["https://upload.wikimedia.org/wikipedia/commons/8/8f/Mirai_Suenaga_Fanart_-_7586726230.jpg"]'),
-    ('Test.series', 1, 'test chap', '["f"]'),
     ('The Last Lantern', 1, 'A light in the rain', '["https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=1400&q=85", "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1400&q=85", "https://images.unsplash.com/photo-1470252649378-9c29740c9fa8?auto=format&fit=crop&w=1400&q=85"]'),
-    ('The Melancholy of Haruhi Suzumiya', 1, 'Placeholder due to copy right reason', '["https://placehold.co/512x720/ffffff/111111.png?text=Blank+Manga+Page"]')
+    ('The Melancholy of Haruhi Suzumiya', 1, 'Haruhi', '["https://i.postimg.cc/pyMprH2d/Screenshot-2026-10-28-213726.png", "https://i.postimg.cc/qqsKHLKQ/Screenshot-2026-10-28-214004.png", "https://i.postimg.cc/t4yKbCKc/Screenshot-2026-10-28-214858.png"]')
 ) AS seed(series_title, number, title, content)
 JOIN series ON series.title = seed.series_title
 ON CONFLICT (series_id, number) DO NOTHING;
